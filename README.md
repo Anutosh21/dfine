@@ -1,83 +1,26 @@
-# Xeus-Lite demo
+# Let's find objects, from a photo to a live camera
 
-[![lite-badge](https://jupyterlite.rtfd.io/en/latest/_static/badge.svg)](https://jupyterlite.github.io/xeus-lite-demo/notebooks/?path=demo.ipynb)
+Load a photo, find the objects in it, then try your camera or a video. Adjust the
+confidence slider and compare the original frame with the detections. Your photos
+and camera frames stay in this browser.
 
-This GitHub template allows you to create deployments of JupyterLite with a custom set of conda packages.
+- [Open the WebGPU notebook](https://anutosh21.github.io/dfine/lab/index.html?path=live-dfine-webgpu.ipynb)
+- [Open the CPU notebook](https://anutosh21.github.io/dfine/lab/index.html?path=live-dfine-cpu.ipynb)
 
-## 💡 How to make your own deployment
+Run the cells from top to bottom in a fresh kernel, then click **Start camera** and
+allow access. You can also use the sample photo or upload your own. Run one notebook
+at a time when comparing CPU and WebGPU.
 
-Creating a new deployment can be done in three easy steps:
+We're using D-FINE Small's pretrained COCO weights, with 640×640 inputs and FP32
+values. Model code, weights and the sample photo are included in `content/`.
 
-**Step 1: Apply the GitHub template**
+Shoutout to [D-FINE](https://github.com/Peterande/D-FINE) and the
+[ExecuTorch object-detection demo](https://executorch.ai/playground/webgpu/#/demo/detect)
+for the inspiration! Built from the
+[Xeus-Lite template](https://github.com/jupyterlite/xeus-lite-demo).
 
-1. Click the **"Use this template"** button in the upper right corner of the GitHub repository.
-2. Choose a name for your project and select the GitHub organization where you want to create it.
-3. Then hit **"Create repository from template"** to finalize the setup.
+Model: Apache-2.0. Photo: Elf; derivatives by Djmirko and FT2, CC BY-SA 3.0.
+Displayed photo derivatives retain that license. Licensing and source details are
+in `content/LICENSE-D-FINE` and `content/sources.json`.
 
-**Step 2: Enable building the GitHub pages from GitHub actions.**
-
-1. Once your repository is created, enable GitHub Pages by configuring GitHub Actions. This will build and deploy your site automatically.
-2. Your deployment will be accessible at the following URL: https://{USERNAME}.github.io/{DEMO_REPO_NAME}.
-
-**Step 3: Customize your conda environment**
-
-1. Update your ``environment.yml`` file to include the required packages.
-2. This ensures that your environment has all the necessary dependencies.
-
-## 🎬 Visual Guide
-
-For a step-by-step visual guide, check out the screencast below:
-
-![Deploy your own](deploy.gif)
-
-## 📦 How to install kernels and packages
-
-You can install specific kernels and extra packages by adding them to the ``environment.yml`` file.
-
-See https://jupyterlite-xeus.readthedocs.io/en/latest/environment.html for more documentation.
-
-### Example 1: JupyterLite with NumPy and Matplotlib
-
-To create a JupyterLite deployment with NumPy and Matplotlib pre-installed, edit the ``environment.yml`` file as follows:
-
-```yml
-name: xeus-kernel
-channels:
-  - https://repo.prefix.dev/emscripten-forge-dev
-  - https://repo.prefix.dev/conda-forge
-dependencies:
-  - xeus-python
-  - numpy
-  - matplotlib
-```
-
-### Example 2: JupyterLite with R and coursekata
-
-To use the R kernel and the coursekata package, edit the environment.yml file as follows:
-
-```yml
-name: xeus-kernel
-channels:
-  - https://repo.prefix.dev/emscripten-forge-dev
-  - https://repo.prefix.dev/conda-forge
-dependencies:
-  - xeus-r
-  - r-coursekata
-```
-
-### Example 3: JupyterLite with C++
-
-To use the C++ kernel, edit the environment.yml file as follows:
-
-```yml
-name: xeus-kernel
-channels:
-  - https://repo.prefix.dev/emscripten-forge-dev
-  - https://repo.prefix.dev/conda-forge
-dependencies:
-  - xeus-cpp
-```
-
-## 📦 How to install other jupyterlite plugins
-
-If you want to install jupyterlite plugins, e.g. `jupyterlite-terminal`, add those plugins to the `.github/build-environment.yml` file.
+To deploy, set **Settings → Pages → Source → GitHub Actions**, then push to `main`.

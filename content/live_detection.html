@@ -1,0 +1,158 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live object detection</title>
+<style>
+:root{font:15px system-ui,sans-serif;color:#e8eef5;color-scheme:dark}body{margin:0;background:#101c2b;padding:20px}h2{margin:0;font-size:25px}h3{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#adc0d4;margin:0 0 12px}p{line-height:1.5;color:#b7c9db}.layout{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:18px;margin-top:18px}.controls{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px}button,select{font:inherit;background:#24394e;border:1px solid #567087;color:white;padding:9px 12px;border-radius:8px;cursor:pointer}button:disabled{opacity:.45;cursor:default}#start{background:#126b60}#stop{background:#874233}aside{background:#182a3d;padding:18px;border:1px solid #334b62;border-radius:12px}.badge{display:inline-block;border:1px solid #47627b;border-radius:20px;padding:7px 11px;margin:4px;font-size:14px}.panel{min-width:0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.label{color:#aabed1;font-size:12px;margin-bottom:6px}canvas{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#142334;border-radius:9px}#compare-stage{position:relative;width:100%;aspect-ratio:4/3;border-radius:9px;overflow:hidden}#compare{width:100%;height:100%;aspect-ratio:auto}.tag{position:absolute;top:12px;padding:5px 10px;border-radius:20px;background:#101e30d9;font-size:12px;pointer-events:none}.left{left:12px}.right{right:12px}#split{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;z-index:2;margin:0;touch-action:none}#divider{position:absolute;left:50%;top:0;height:100%;width:2px;background:white;pointer-events:none;transform:translateX(-1px)}#divider::after{content:'↔';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:white;color:#17283a;font-size:22px}#stats{font:13px/1.7 ui-monospace,monospace;white-space:pre-wrap;color:#9fe7cb;min-height:54px;margin-top:14px}#status{min-height:24px}#threshold{width:100%}#confidence{float:right;color:#c8e7ff}video,input[type=file]{display:none}.error{color:#ffb0a1}.note{font-size:12px}hr{border:0;border-top:1px solid #354e65;margin:20px 0}[hidden]{display:none!important}@media(max-width:760px){.layout{grid-template-columns:1fr}.grid{grid-template-columns:1fr}body{padding:12px}}
+</style>
+<h2>Let's find objects, live</h2><p id="caption"></p>
+<div class="layout"><main>
+<div id="compare-stage"><canvas id="compare" width="640" height="480"></canvas><span id="original-tag" class="tag left" hidden>Original</span><span id="result-tag" class="tag right">Detections</span><div id="divider" hidden></div><input id="split" type="range" min="0" max="100" value="50" aria-label="Before and after comparison" hidden></div>
+<div class="grid" id="side-by-side" hidden><section class="panel"><div class="label">INPUT FRAME</div><canvas id="original" width="640" height="480"></canvas></section><section class="panel"><div class="label">DETECTIONS</div><canvas id="output" width="640" height="480"></canvas></section></div>
+<p id="status" role="status">Ready. Try the sample or start your camera.</p><div id="stats"></div>
+</main><aside><h3>Input</h3><div class="controls"><button id="sample">Sample photo</button><button id="upload">Upload photo / video</button><button id="start">Start camera</button><button id="stop" disabled>Stop</button><button id="flip" disabled aria-pressed="false">Mirror camera</button><input id="file" type="file" accept="image/*,video/*"></div><hr>
+<h3>Confidence <span id="confidence">35%</span></h3><input id="threshold" type="range" min="1" max="99" value="35" aria-label="Detection confidence"><hr><h3>View</h3><select id="view" aria-label="Comparison view"><option value="overlay">Detection overlay</option><option value="compare">Before / after slider</option><option value="side">Side by side</option></select><hr><h3>Found</h3><div id="found">Run a photo or start the camera.</div><hr><button id="save" disabled>Save result PNG</button></aside></div>
+<video id="video" autoplay playsinline muted></video>
+<p class="note">Every displayed result comes from the compiled PyTorch model. One frame runs at a time; the next is captured after its result arrives. FPS includes capture, Python, GPU work, readback and display. Stop releases the camera. Your frames stay in this tab.</p>
+<script type="module">
+const payload = __VISION_PAYLOAD__;
+const $ = id => document.getElementById(id);
+const channel = new BroadcastChannel(payload.channel);
+const capture = document.createElement('canvas'), ctx = capture.getContext('2d');
+const evidence = {ready:true,frames:[],errors:[],running:false,inFlight:0,maxInFlight:0,tracks:[],closed:false};
+window.liveDetection = evidence;
+let stream = null, running = false, closed = false, pending = null, serial = 0, generation = 0;
+let still = null, timer = null, mirrored = false, videoURL = null;
+let lastPNG = null, lastCompletedAt = null;
+$('caption').textContent = `Original D-FINE Small · ${payload.size} × ${payload.size} model input · ${payload.device.toUpperCase()} · compiled in this tab`;
+
+function status(text, error=false){$('status').textContent=text;$('status').className=error?'error':'';}
+function buttons(){
+  $('start').disabled=closed||running||!!pending;
+  $('stop').disabled=!running;
+  $('sample').disabled=closed||running||!!pending;
+  $('upload').disabled=closed||running||!!pending;
+  $('threshold').disabled=closed; $('flip').disabled=closed||!running;
+}
+function stopCamera(message='Camera stopped. The last result stays here.'){
+  running=false;evidence.running=false;generation++;
+  if(stream)for(const track of stream.getTracks())track.stop();
+  stream=null;$('video').pause();$('video').srcObject=null;
+  $('video').removeAttribute('src');$('video').load();
+  if(videoURL){URL.revokeObjectURL(videoURL);videoURL=null;}
+  buttons();status(message);
+}
+async function drawURI(canvas, uri){
+  const image=new Image();image.src=uri;await image.decode();
+  canvas.width=image.width;canvas.height=image.height;
+  canvas.getContext('2d').drawImage(image,0,0);
+}
+function fit(source){
+  const w=source.videoWidth||source.width, h=source.videoHeight||source.height;
+  const scale=Math.min(1,640/w,480/h);
+  capture.width=Math.max(1,Math.round(w*scale));capture.height=Math.max(1,Math.round(h*scale));
+  ctx.save();
+  if(mirrored&&source===$('video')){ctx.translate(capture.width,0);ctx.scale(-1,1);}
+  ctx.drawImage(source,0,0,capture.width,capture.height);ctx.restore();
+  return capture.toDataURL('image/jpeg',.92);
+}
+function submit(source){
+  if(closed||pending)return;
+  const started=performance.now();
+  const uri=fit(source);
+  pending={id:++serial,started,generation,uri};
+  evidence.inFlight=1;evidence.maxInFlight=Math.max(evidence.maxInFlight,1);
+  channel.postMessage({kind:'frame',id:pending.id,jpeg:uri.split(',')[1],threshold:Number($('threshold').value)/100});
+  timer=setTimeout(()=>{
+    if(pending){evidence.errors.push('Frame timed out');stopCamera('Frame timed out. Restart the kernel before trying again.');closed=true;evidence.closed=true;buttons();}
+  },60000);
+  buttons();status(running?'Live. Processing the next frame…':'Processing this photo…');
+}
+async function sample(){
+  if(pending||running||closed)return;
+  try{const image=new Image();image.src='data:'+payload.sample_type+';base64,'+payload.sample;await image.decode();still=image;submit(still);}
+  catch(error){status(error.message,true);evidence.errors.push(error.message);}
+}
+$('start').onclick=async()=>{
+  if(running||pending||closed)return;
+  delete evidence.cameraError;
+  const requestedGeneration=++generation;$('start').disabled=true;
+  try{
+    const acquired=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:'user'},audio:false});
+    if(closed||generation!==requestedGeneration){for(const t of acquired.getTracks())t.stop();return;}
+    stream=acquired;evidence.tracks.push(...stream.getTracks());
+    $('video').srcObject=stream;await $('video').play();
+    if(closed||generation!==requestedGeneration){stopCamera();return;}
+    running=true;evidence.running=true;lastCompletedAt=null;buttons();submit($('video'));
+  }catch(error){stopCamera('Camera unavailable. Try the sample or upload a photo.');status(error.message+' — try the sample or upload a photo.',true);evidence.cameraError=error.message;}
+};
+$('stop').onclick=()=>stopCamera();$('sample').onclick=sample;
+$('video').onended=()=>stopCamera('Video finished. The last result stays here.');
+$('save').onclick=()=>{if(lastPNG){const a=document.createElement('a');a.href=lastPNG;a.download='dfine-detections.png';a.click();}};
+$('upload').onclick=()=>$('file').click();
+$('file').onchange=async()=>{
+  const file=$('file').files[0];if(!file||running||pending||closed)return;
+  const url=URL.createObjectURL(file);
+  try{
+    if(file.type.startsWith('video/')){
+      videoURL=url;$('video').src=url;await $('video').play();
+      running=true;evidence.running=true;lastCompletedAt=null;buttons();submit($('video'));
+    }else{const image=new Image();image.src=url;await image.decode();still=image;submit(still);}
+  }catch(error){stopCamera();status('Could not open that file: '+error.message,true);}
+  finally{if(videoURL!==url)URL.revokeObjectURL(url);$('file').value='';}
+};
+$('threshold').oninput=()=>{$('confidence').textContent=$('threshold').value+'%';};
+$('threshold').onchange=()=>{if(!running&&still&&!pending)submit(still);};
+$('flip').onclick=()=>{mirrored=!mirrored;$('flip').setAttribute('aria-pressed',String(mirrored));};
+function showDetections(detections){
+  const counts=new Map();
+  for(const d of detections)counts.set(d.label,(counts.get(d.label)||0)+1);
+  $('found').replaceChildren();
+  if(!counts.size){$('found').textContent='No objects above this confidence.';return;}
+  for(const [name,count] of counts){const badge=document.createElement('span');badge.className='badge';badge.textContent=name+'  '+count;$('found').append(badge);}
+}
+function paintComparison(){
+  const original=$('original'),output=$('output'),canvas=$('compare');
+  if(canvas.width!==original.width||canvas.height!==original.height){canvas.width=original.width;canvas.height=original.height;}
+  $('compare-stage').style.aspectRatio=`${original.width}/${original.height}`;
+  $('compare-stage').style.setProperty('--ratio',original.width/original.height);
+  const g=canvas.getContext('2d'),split=Number($('split').value)/100;
+  g.clearRect(0,0,canvas.width,canvas.height);g.drawImage(output,0,0);
+  if($('view').value==='compare'){g.save();g.beginPath();g.rect(0,0,canvas.width*split,canvas.height);g.clip();g.drawImage(original,0,0);g.restore();}
+  $('divider').style.left=(split*100)+'%';
+  $('split').setAttribute('aria-valuetext',`${Math.round(split*100)} percent original`);
+}
+$('split').oninput=paintComparison;
+$('view').onchange=()=>{
+  $('compare-stage').hidden=$('view').value==='side';$('side-by-side').hidden=$('view').value!=='side';
+  for(const id of ['split','divider','original-tag'])$(id).hidden=$('view').value!=='compare';
+  paintComparison();
+};
+channel.onmessage=async({data})=>{
+  if(data.kind==='closed'){stopCamera('Panel closed. Run its notebook cell again to reopen it.');closed=true;evidence.closed=true;buttons();channel.close();return;}
+  if(data.kind!=='result'||!pending||data.id!==pending.id)return;
+  clearTimeout(timer);timer=null;
+  const request=pending;
+  if(data.error){pending=null;evidence.inFlight=0;evidence.errors.push(data.error);stopCamera();status(data.error,true);return;}
+  try{
+    if(request.generation===generation&&!closed){
+      await Promise.all([drawURI($('original'),request.uri),drawURI($('output'),'data:image/png;base64,'+data.png)]);
+      lastPNG='data:image/png;base64,'+data.png;$('save').disabled=false;
+      paintComparison(); showDetections(data.detections);
+      const now=performance.now(),total=now-request.started;
+      const interval=running&&lastCompletedAt!==null?now-lastCompletedAt:total;
+      lastCompletedAt=now;
+      const record={id:data.id,...data.timings,roundtrip_ms:total,completed_fps:1000/interval,threshold:data.threshold,detections:data.detections};
+      evidence.frames.push(record);if(evidence.frames.length>120)evidence.frames.shift();
+      $('stats').textContent=(running?`${record.completed_fps.toFixed(1)} completed updates/s · `:'')+`${total.toFixed(1)} ms/frame\n`+
+        `prepare ${record.prepare_ms.toFixed(1)} · model + transfers ${record.model_ms.toFixed(1)} · boxes + labels ${record.postprocess_ms.toFixed(1)} · encode ${record.encode_ms.toFixed(1)} ms`;
+      status(running?'Live. Every result comes from the compiled PyTorch model.':'Photo processed. Adjust confidence or start your camera.');
+    }
+  }catch(error){evidence.errors.push(error.message);stopCamera();status(error.message,true);}
+  finally{pending=null;evidence.inFlight=0;buttons();}
+  if(running&&!closed)requestAnimationFrame(()=>{if(running)submit($('video'));});
+  else if(!closed&&still&&Math.abs(Number($('threshold').value)/100-data.threshold)>1e-6)queueMicrotask(()=>submit(still));
+};
+function dispose(){stopCamera();closed=true;evidence.closed=true;clearTimeout(timer);channel.close();}
+addEventListener('pagehide',dispose);
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&running)stopCamera('Camera paused while this panel is hidden. Click Start to resume.');});
+buttons();
+</script></html>

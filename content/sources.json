@@ -1,0 +1,9 @@
+{
+  "model": "https://github.com/Peterande/D-FINE/tree/956d1709314c2c6a4df6f34de232054578a7449f",
+  "checkpoint": "https://huggingface.co/Peterande/D-FINE/resolve/19214e91f5ce4c1e609022c38b1fc953c47404e7/dfine_s_coco.pth",
+  "checkpoint_sha256": "48a6c8cc43eb57186843f752e2e8461ddd3326e0d3c575e71e6e960844683e89",
+  "classes": "COCO categories from the pinned D-FINE source; original insertion order.",
+  "photo": "https://commons.wikimedia.org/wiki/File:YellowLabradorLooking_new.jpg",
+  "inspiration": "https://executorch.ai/playground/",
+  "photo_credit": "Elf; derivatives by Djmirko and FT2, CC BY-SA 3.0"
+}
