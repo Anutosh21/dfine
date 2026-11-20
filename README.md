@@ -12,7 +12,13 @@ allow access. You can also use the sample photo or upload your own. Run one note
 at a time when comparing CPU and WebGPU.
 
 We're using D-FINE Small's pretrained COCO weights, with 640×640 inputs and FP32
-values. Model code, weights and the sample photo are included in `content/`.
+values. Model code and the sample photo are included in `content/`.
+
+The model-loading cell downloads the original 39.9 MiB checkpoint from a pinned
+GitHub revision and verifies its SHA-256 checksum. Later visits reuse the browser
+cache while it remains available. Private browsing, clearing site data or browser
+eviction can require another download. The kernel no longer waits for the weights
+at startup.
 
 Shoutout to [D-FINE](https://github.com/Peterande/D-FINE) and the
 [ExecuTorch object-detection demo](https://executorch.ai/playground/webgpu/#/demo/detect)
@@ -24,3 +30,6 @@ Displayed photo derivatives retain that license. Licensing and source details ar
 in `content/LICENSE-D-FINE` and `content/sources.json`.
 
 To deploy, set **Settings → Pages → Source → GitHub Actions**, then push to `main`.
+
+The browser bundle omits development headers, static libraries and package tests.
+Both notebooks use Turbine/IREE for compilation and execution on their selected device.

@@ -5,5 +5,10 @@
   "classes": "COCO categories from the pinned D-FINE source; original insertion order.",
   "photo": "https://commons.wikimedia.org/wiki/File:YellowLabradorLooking_new.jpg",
   "inspiration": "https://executorch.ai/playground/",
-  "photo_credit": "Elf; derivatives by Djmirko and FT2, CC BY-SA 3.0"
+  "photo_credit": "Elf; derivatives by Djmirko and FT2, CC BY-SA 3.0",
+  "runtime_download": {
+    "url": "https://raw.githubusercontent.com/Anutosh21/dfine/1ef76758c3c4e5001a548d28dd763ca32d494ed6/content/dfine_s_coco.pth",
+    "sha256": "48a6c8cc43eb57186843f752e2e8461ddd3326e0d3c575e71e6e960844683e89",
+    "cache": "Browser Cache Storage; SHA-256 verified on every load."
+  }
 }
