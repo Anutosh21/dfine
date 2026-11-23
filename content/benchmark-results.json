@@ -1,0 +1,103 @@
+{
+  "recorded_date": "2026-11-23",
+  "model": "D-FINE Small COCO",
+  "precision": "FP32",
+  "input": [
+    1,
+    3,
+    640,
+    640
+  ],
+  "execution": "torch.compile with Turbine/IREE for CPU and WebGPU",
+  "browser": "157.0.8103.80",
+  "machine": {
+    "cpu": "Apple M5",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "framework_versions": {
+    "pytorch": "2.15.0a0 build 1",
+    "iree-base-compiler": "20261115",
+    "iree-base-runtime": "20261115",
+    "iree-turbine": "3.10.0 build 2"
+  },
+  "checkpoint_sha256": "48a6c8cc43eb57186843f752e2e8461ddd3326e0d3c575e71e6e960844683e89",
+  "image_processing": "OpenCV decode, shared 640x640 letterbox preprocessing and shared detection drawing for photo and camera",
+  "delivery": "Locally built JupyterLite site. Weights downloaded from the actual pinned public URL once; later runs block network downloads and reuse verified Cache Storage. Completed images use the sample photo only; camera capture is not started.",
+  "compiled_inference": {
+    "cpu": {
+      "compile_and_first_prediction_seconds": 23.135,
+      "device": "cpu",
+      "device_setup_seconds": 4.6823000000000015,
+      "eager_cpu_reference_seconds": 0.979000000000001,
+      "max_abs_error": {
+        "pred_boxes": 0.000004649162292480469,
+        "pred_logits": 0.0001697540283203125
+      },
+      "model": "D-FINE Small COCO",
+      "model_input": [
+        1,
+        3,
+        640,
+        640
+      ],
+      "output_copy_or_readback_ms": 0.5000000000023874,
+      "passed": true,
+      "precision": "FP32",
+      "pytorch": "2.15.0a0",
+      "repeats": 10,
+      "resident_inference_median_ms": 1741.7500000000032,
+      "warmed_completed_seconds": [
+        1.744400000000006,
+        1.7209999999999965,
+        1.7391000000000005,
+        1.8222999999999985,
+        1.8676999999999992,
+        1.7356000000000051,
+        1.7513999999999967,
+        1.6899999999999977,
+        1.688200000000002,
+        1.765500000000003
+      ],
+      "weights_and_model_load_seconds": 0.27609999999999957
+    },
+    "webgpu": {
+      "compile_and_first_prediction_seconds": 30.955899999999996,
+      "device": "webgpu",
+      "device_setup_seconds": 6.7089,
+      "eager_cpu_reference_seconds": 0.9191000000000003,
+      "max_abs_error": {
+        "pred_boxes": 0.0000032782554626464844,
+        "pred_logits": 0.000110626220703125
+      },
+      "model": "D-FINE Small COCO",
+      "model_input": [
+        1,
+        3,
+        640,
+        640
+      ],
+      "output_copy_or_readback_ms": 3.5999999999987153,
+      "passed": true,
+      "precision": "FP32",
+      "pytorch": "2.15.0a0",
+      "repeats": 10,
+      "resident_inference_median_ms": 363.20000000000266,
+      "warmed_completed_seconds": [
+        0.3622000000000014,
+        0.3592999999999975,
+        0.3567999999999998,
+        0.3567999999999998,
+        0.3597999999999999,
+        0.36420000000000385,
+        0.39569999999999794,
+        0.36769999999999925,
+        0.3832999999999984,
+        0.3896000000000015
+      ],
+      "weights_and_model_load_seconds": 0.2828999999999997
+    }
+  },
+  "resident_inference_speedup": 4.795567180616714,
+  "weights_network_requests": 1
+}
